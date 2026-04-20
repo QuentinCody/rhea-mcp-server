@@ -2,117 +2,71 @@ import type { ApiCatalog } from "@bio-mcp/shared/codemode/catalog";
 
 /**
  * Rhea (https://www.rhea-db.org) — expert-curated database of biochemical
- * reactions. Public API returns RDF/XML by default; we force `format=json`
- * through the fetch layer so Code Mode always sees structured data.
+ * reactions.
+ *
+ * IMPORTANT: Rhea's non-`/rhea` paths (`/reaction`, `/ec/...`, `/chebi/...`,
+ * `/uniprot/...`, `/go/...`, `/kegg/...`, `/compound`) are served by the
+ * public web site, NOT the search API, and upstream returns HTTP 403
+ * (Cloudflare Turnstile) when called directly. We removed them from the
+ * catalog. For all those use-cases, drive them through `/rhea?query=...`
+ * with the right term:
+ *
+ *   - EC number:     /rhea?query=EC%202.7.1.1
+ *   - ChEBI:         /rhea?query=CHEBI:15377   (or compound name)
+ *   - UniProt:       /rhea?query=UNIPROT:P00734
+ *   - GO:            /rhea?query=GO:0004672
+ *   - KEGG:          /rhea?query=KEGG:R00703
+ *   - Reaction ID:   /rhea?query=RHEA:47148
+ *   - Compound name: /rhea?query=caffeine
+ *
+ * `/rhea` returns `{ count, limit, offset, results: [...] }` and the adapter
+ * forces `format=json` by default. Large list results auto-stage at >30KB.
  */
 export const rheaCatalog: ApiCatalog = {
-    name: "Rhea",
-    baseUrl: "https://www.rhea-db.org",
-    version: "1.0",
-    auth: "none",
-    endpointCount: 9,
-    notes:
-        "- `format=json` is forced by the adapter — override to xlsx/tsv/rdf if needed.\n" +
-        "- Search is the workhorse endpoint: `/rhea` with `query=<term>` (free text, compound name, EC number, or RHEA:<id>).\n" +
-        "- Reaction detail: `/reaction?id=RHEA:<id>` returns the same shape as a single-hit search.\n" +
-        "- `columns` on `/rhea` picks output fields (e.g. `rhea-id,equation,ec,chebi-id,uniprot`).\n" +
-        "- Cross-reference endpoints (/ec/, /chebi/, /uniprot/) take the raw external accession.\n" +
-        "- Typical result shape: `{ count, limit, offset, results: [...] }` — use `record_path=results` downstream.",
-    endpoints: [
-        // ===================================================================
-        // Search & reaction discovery
-        // ===================================================================
-        {
-            method: "GET",
-            path: "/rhea",
-            summary: "Search Rhea reactions by free text, compound, EC number, or RHEA ID",
-            category: "search",
-            queryParams: [
-                { name: "query", type: "string", required: true, description: "Search term — compound name, EC number, RHEA ID (e.g. 'caffeine', 'EC 2.7.1.1', 'RHEA:47148')" },
-                { name: "columns", type: "string", required: false, description: "Comma-separated fields (e.g. 'rhea-id,equation,ec,chebi-id,uniprot')" },
-                { name: "limit", type: "number", required: false, description: "Max results per page (default 25)" },
-                { name: "offset", type: "number", required: false, description: "Page offset for pagination" },
-                { name: "format", type: "string", required: false, description: "Response format", enum: ["json", "tsv", "rdf", "xlsx"] },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/reaction",
-            summary: "Retrieve a single reaction record by RHEA ID",
-            category: "reaction",
-            queryParams: [
-                { name: "id", type: "string", required: true, description: "RHEA ID (e.g. 'RHEA:47148' or bare '47148')" },
-                { name: "format", type: "string", required: false, description: "Response format", enum: ["json", "tsv", "rdf"] },
-            ],
-        },
-
-        // ===================================================================
-        // Cross-references (upstream identifiers → Rhea reactions)
-        // ===================================================================
-        {
-            method: "GET",
-            path: "/ec/{ec_number}",
-            summary: "List Rhea reactions catalyzed by an Enzyme Commission (EC) number",
-            category: "crossref",
-            pathParams: [
-                { name: "ec_number", type: "string", required: true, description: "EC number without prefix (e.g. '2.7.1.1')" },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/chebi/{chebi_id}",
-            summary: "List Rhea reactions involving a ChEBI compound",
-            category: "crossref",
-            pathParams: [
-                { name: "chebi_id", type: "string", required: true, description: "ChEBI accession (bare number, e.g. '15377' for water)" },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/uniprot/{uniprot_id}",
-            summary: "List Rhea reactions catalyzed by a UniProtKB protein",
-            category: "crossref",
-            pathParams: [
-                { name: "uniprot_id", type: "string", required: true, description: "UniProtKB accession (e.g. 'P00734')" },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/go/{go_id}",
-            summary: "List Rhea reactions linked to a Gene Ontology term",
-            category: "crossref",
-            pathParams: [
-                { name: "go_id", type: "string", required: true, description: "GO ID with or without prefix (e.g. 'GO:0004672' or '0004672')" },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/kegg/{kegg_id}",
-            summary: "List Rhea reactions cross-referenced to a KEGG reaction or compound",
-            category: "crossref",
-            pathParams: [
-                { name: "kegg_id", type: "string", required: true, description: "KEGG reaction (R-prefixed) or compound ID" },
-            ],
-        },
-
-        // ===================================================================
-        // Controlled vocabularies / metadata
-        // ===================================================================
-        {
-            method: "GET",
-            path: "/compound",
-            summary: "Search Rhea-used ChEBI compounds by name or identifier",
-            category: "metadata",
-            queryParams: [
-                { name: "query", type: "string", required: true, description: "Compound name or ChEBI accession" },
-                { name: "limit", type: "number", required: false, description: "Max results (default 25)" },
-            ],
-        },
-        {
-            method: "GET",
-            path: "/release",
-            summary: "Return current Rhea release version, date, and statistics",
-            category: "metadata",
-        },
-    ],
+	name: "Rhea",
+	baseUrl: "https://www.rhea-db.org",
+	version: "1.0",
+	auth: "none",
+	endpointCount: 1,
+	notes:
+		"- /rhea is the ONLY supported endpoint. Use it for ALL lookups (free text, EC, ChEBI, UniProt, GO, KEGG, RHEA IDs).\n" +
+		"- `format=json` is forced by the adapter. Do NOT override with format=rdf/turtle/xml — upstream fronts those paths with Cloudflare Turnstile and returns 403.\n" +
+		"- `columns` picks output fields (rhea-id, equation, ec, chebi-id, chebi, uniprot, etc.).\n" +
+		"- Typical result shape: { count, limit, offset, results: [...] } — flatten via `record_path=results`.\n" +
+		"- Rhea's /reaction, /ec/*, /chebi/*, /uniprot/*, /go/*, /kegg/*, /compound paths are web-only and NOT in this catalog — use /rhea?query=... instead.",
+	endpoints: [
+		{
+			method: "GET",
+			path: "/rhea",
+			summary:
+				"Universal Rhea search — use for free text, compound names, EC numbers, ChEBI/UniProt/GO/KEGG/RHEA identifiers. Replaces the deprecated /reaction, /ec/{id}, /chebi/{id}, /uniprot/{id}, /go/{id}, /kegg/{id}, /compound endpoints.",
+			category: "search",
+			queryParams: [
+				{
+					name: "query",
+					type: "string",
+					required: true,
+					description:
+						"Search term. Supports free text ('caffeine'), EC ('EC 2.7.1.1'), identifiers (RHEA:47148, CHEBI:15377, UNIPROT:P00734, GO:0004672, KEGG:R00703).",
+				},
+				{
+					name: "columns",
+					type: "string",
+					required: false,
+					description:
+						"Comma-separated fields (e.g. 'rhea-id,equation,ec,chebi-id,uniprot'). Reduce to avoid large htmlequation blobs that push staging.",
+				},
+				{ name: "limit", type: "number", required: false, description: "Max results per page (default 25)" },
+				{ name: "offset", type: "number", required: false, description: "Page offset for pagination" },
+				{
+					name: "format",
+					type: "string",
+					required: false,
+					description:
+						"Response format. Do NOT override — the adapter forces json; other values hit a Cloudflare 403.",
+					enum: ["json"],
+				},
+			],
+		},
+	],
 };

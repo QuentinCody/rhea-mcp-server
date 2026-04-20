@@ -23,8 +23,10 @@ export async function rheaFetch(
         ...(opts?.headers ?? {}),
     };
 
-    // Default to JSON; Rhea returns RDF/XML otherwise.
-    const mergedParams: Record<string, unknown> = { format: "json", ...(params ?? {}) };
+    // FORCE json: caller-supplied format=rdf/turtle/xml is overridden because
+    // Rhea's non-JSON paths are fronted by Cloudflare Turnstile and return 403
+    // to non-browser clients.
+    const mergedParams: Record<string, unknown> = { ...(params ?? {}), format: "json" };
 
     return restFetch(baseUrl, path, mergedParams, {
         ...opts,
