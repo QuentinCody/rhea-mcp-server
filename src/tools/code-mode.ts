@@ -23,6 +23,8 @@ export function registerCodeMode(
 
     const executeTool = createExecuteTool({
         prefix: "rhea",
+        // Verifiable provenance: rhea_execute results carry a _meta.citation.
+        source: { id: "rhea", name: "Rhea", url: "https://www.rhea-db.org", license: "CC BY 4.0" },
         catalog: rheaCatalog,
         apiFetch,
         doNamespace: env.RHEA_DATA_DO,
