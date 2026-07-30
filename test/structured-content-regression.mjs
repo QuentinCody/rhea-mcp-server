@@ -51,7 +51,7 @@ assertContains('src/tools/get-schema.ts', schemaContent, 'rhea_get_schema', 'get
 
 const indexContent = readFile('src/index.ts');
 assertContains('src/index.ts', indexContent, 'RheaDataDO', 'index.ts exports RheaDataDO');
-assertContains('src/index.ts', indexContent, 'McpAgent', 'index.ts uses McpAgent');
+assertContains('src/index.ts', indexContent, 'StatelessMcpWorker', 'index.ts uses StatelessMcpWorker');
 
 const catalogContent = readFile('src/spec/catalog.ts');
 assertContains('src/spec/catalog.ts', catalogContent, 'rheaCatalog', 'catalog exports rheaCatalog');
