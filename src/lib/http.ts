@@ -9,8 +9,8 @@ export interface RheaFetchOptions extends Omit<RestFetchOptions, "retryOn"> {
 
 /**
  * Fetch from the Rhea reaction database REST API.
- * Rhea defaults to RDF for many endpoints, so always include `format=json`
- * as a default query param unless the caller overrides it.
+ * Retain the existing JSON search contract. Public REST documentation also
+ * describes TSV; the separate SPARQL adapter uses its own content negotiation.
  */
 export async function rheaFetch(
     path: string,
@@ -23,9 +23,7 @@ export async function rheaFetch(
         ...(opts?.headers ?? {}),
     };
 
-    // FORCE json: caller-supplied format=rdf/turtle/xml is overridden because
-    // Rhea's non-JSON paths are fronted by Cloudflare Turnstile and return 403
-    // to non-browser clients.
+    // Preserve the legacy search format; callers cannot change it implicitly.
     const mergedParams: Record<string, unknown> = { ...(params ?? {}), format: "json" };
 
     return restFetch(baseUrl, path, mergedParams, {
